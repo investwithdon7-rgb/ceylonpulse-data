@@ -30,7 +30,7 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data archive
           git diff --cached --quiet || git commit -m "Daily climate data $(date -u +%Y-%m-%d)"
-          git pull --rebase --autostash
+          git pull --rebase --autostash -X theirs
           git push
       - name: Refresh jsDelivr CDN cache
         if: always()

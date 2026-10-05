@@ -9,7 +9,7 @@ calling many APIs from their browser.
 | `data/enso.json` | daily, 06:00 Sri Lanka | NOAA CPC ONI / Relative ONI, the ENSO diagnostic discussion, and the ECMWF SEAS5 Niño-3.4 projection |
 | `data/outlook-3m.json` | daily, 06:00 Sri Lanka | Next 3 months for all 25 districts and 13 reservoir catchments: ECMWF SEAS5 rain and temperature vs normal, and below / near / above-normal chances from the 51 ensemble runs |
 | `data/c3s-outlook.json` | monthly, 14th | Copernicus C3S multi-model chances (ECMWF, UK Met Office, Météo-France, DWD, CMCC, NCEP, JMA, ECCC, BoM) |
-| `data/status.json` | every run | When each file was last refreshed |
+| `data/status.json` | daily | When the daily files were last refreshed (each file also carries its own `generated` time) |
 | `archive/` | every run | Dated copies of each forecast, kept so forecast accuracy can be checked later |
 
 Website access (CORS enabled, cached at the edge):

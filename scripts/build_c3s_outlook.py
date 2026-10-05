@@ -208,10 +208,6 @@ def main():
     os.makedirs(os.path.dirname(OUT), exist_ok=True)
     json.dump(out, open(OUT, 'w', encoding='utf-8'), ensure_ascii=False, separators=(',', ':'))
     print('wrote', OUT, os.path.getsize(OUT), 'bytes,', len(models), 'models')
-    status_path = os.path.join(ROOT, 'data', 'status.json')
-    status = json.load(open(status_path, encoding='utf-8')) if os.path.exists(status_path) else {}
-    status['c3s-outlook'] = out['generated']
-    json.dump(status, open(status_path, 'w', encoding='utf-8'), indent=1)
 
 
 if __name__ == '__main__':

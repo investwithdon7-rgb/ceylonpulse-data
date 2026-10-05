@@ -46,10 +46,10 @@ jobs:
           cp data/c3s-outlook.json "archive/c3s-outlook/$(date -u +%Y-%m).json"
           git add data archive
           git diff --cached --quiet || git commit -m "Copernicus multi-model outlook $(date -u +%Y-%m)"
-          git pull --rebase --autostash
+          git pull --rebase --autostash -X theirs
           git push
       - name: Refresh jsDelivr CDN cache
         run: |
-          for f in c3s-outlook.json status.json; do
+          for f in c3s-outlook.json; do
             curl -s -o /dev/null -w "$f %{http_code}\n" "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
           done
