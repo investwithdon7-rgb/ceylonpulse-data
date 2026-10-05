@@ -23,6 +23,11 @@ jobs:
           python-version: '3.12'
       - name: Build ENSO status and 3-month outlook
         run: python scripts/build_daily.py
+      - name: Weekly Epidemiological Report (new reports only)
+        if: always()
+        run: |
+          pip install -q pypdf
+          python scripts/build_epid.py
       - name: Commit updated data
         if: always()
         run: |
@@ -35,6 +40,6 @@ jobs:
       - name: Refresh jsDelivr CDN cache
         if: always()
         run: |
-          for f in enso.json outlook-3m.json status.json; do
+          for f in enso.json outlook-3m.json status.json epidemiology.json; do
             curl -s -o /dev/null -w "$f %{http_code}\n" "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
           done

@@ -13,6 +13,7 @@ calling many APIs from their browser.
 | `data/reservoirs.json` | hourly check | Irrigation Department daily water level and storage of 74 major reservoirs, island total |
 | `data/rivers.json` | hourly | Latest reading at each Irrigation Department river gauge with alert / minor / major flood levels |
 | `data/fires.json` | hourly | NASA FIRMS VIIRS fire detections over Sri Lanka, last 3 days |
+| `data/epidemiology.json` | daily check | Epidemiology Unit Weekly Epidemiological Report, Table 1: weekly and year-to-date dengue, leptospirosis and other notifiable diseases by RDHS. National figures are the sum of districts (the printed national row is occasionally wrong) |
 | `data/status.json` | daily | When the daily files were last refreshed (each file also carries its own `generated` time) |
 | `archive/` | every run | Dated copies of each forecast, kept so forecast accuracy can be checked later |
 
@@ -37,7 +38,7 @@ The hourly feeds rewrite a file only when its data changes, so `generated` is th
 
 ## Sources and licences
 
-NOAA Climate Prediction Center (public domain) · Irrigation Department of Sri Lanka · Ceylon Petroleum Corporation · NASA FIRMS · ECMWF SEAS5 and ERA5 via [Open-Meteo](https://open-meteo.com) (CC BY 4.0) ·
+NOAA Climate Prediction Center (public domain) · Irrigation Department of Sri Lanka · Epidemiology Unit, Ministry of Health · Ceylon Petroleum Corporation · NASA FIRMS · ECMWF SEAS5 and ERA5 via [Open-Meteo](https://open-meteo.com) (CC BY 4.0) ·
 Copernicus Climate Change Service, C3S seasonal forecasts (generated using Copernicus Climate Change Service information;
 neither the European Commission nor ECMWF is responsible for any use that may be made of it) ·
 district boundaries from geoBoundaries / OpenStreetMap (ODbL).
