@@ -1,0 +1,40 @@
+name: Hourly feeds (fuel, reservoirs, rivers, fires)
+
+on:
+  schedule:
+    - cron: '20 * * * *'   # every hour at :20
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Build feeds
+        env:
+          FIRMS_KEY: ${{ secrets.FIRMS_KEY }}
+        run: python scripts/build_feeds.py
+      - name: Commit changed data
+        if: always()
+        run: |
+          git config user.name "ceylonpulse-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data archive
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Feeds update $(date -u +%Y-%m-%dT%H:%MZ)"
+          git pull --rebase --autostash -X theirs
+          git push
+          for f in $(git diff --name-only HEAD~1 -- data); do
+            curl -s -o /dev/null "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/$f" || true
+          done
