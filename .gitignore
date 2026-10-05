@@ -1,0 +1,4 @@
+.c3s-cache/
+__pycache__/
+*.nc
+.cdsapirc

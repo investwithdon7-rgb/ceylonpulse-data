@@ -1,0 +1,55 @@
+name: Monthly Copernicus multi-model outlook
+
+on:
+  schedule:
+    - cron: '0 2 14 * *'   # 14th, 07:30 Sri Lanka time (C3S publishes on the 13th, 12:00 UTC)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - run: pip install -r requirements.txt
+      - name: Copernicus credentials (from encrypted secret)
+        env:
+          CDSAPI_KEY: ${{ secrets.CDSAPI_KEY }}
+        run: |
+          test -n "$CDSAPI_KEY" || { echo "CDSAPI_KEY secret is missing"; exit 1; }
+          printf 'url: https://cds.climate.copernicus.eu/api\nkey: %s\n' "$CDSAPI_KEY" > ~/.cdsapirc
+          chmod 600 ~/.cdsapirc
+      - name: Cache hindcast downloads
+        uses: actions/cache@v4
+        with:
+          path: .c3s-cache
+          key: c3s-${{ github.run_id }}
+          restore-keys: c3s-
+      - name: Build multi-model outlook
+        run: python scripts/build_c3s_outlook.py
+      - name: Commit updated data
+        run: |
+          git config user.name "ceylonpulse-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          mkdir -p archive/c3s-outlook
+          cp data/c3s-outlook.json "archive/c3s-outlook/$(date -u +%Y-%m).json"
+          git add data archive
+          git diff --cached --quiet || git commit -m "Copernicus multi-model outlook $(date -u +%Y-%m)"
+          git pull --rebase --autostash
+          git push
+      - name: Refresh jsDelivr CDN cache
+        run: |
+          for f in c3s-outlook.json status.json; do
+            curl -s -o /dev/null -w "$f %{http_code}\n" "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
+          done
