@@ -1,4 +1,4 @@
-name: Hourly feeds (fuel, reservoirs, rivers, fires, prices, tourism)
+name: Hourly feeds (fuel, reservoirs, rivers, fires, prices, tourism, news)
 
 on:
   schedule:
@@ -31,6 +31,9 @@ jobs:
           pip install -q pypdf
           python scripts/build_prices.py
           python scripts/build_tourism.py
+      - name: News headlines (7 Sri Lankan RSS feeds)
+        if: always()
+        run: python scripts/build_news.py
       - name: Commit changed data
         if: always()
         run: |
