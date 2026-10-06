@@ -31,6 +31,11 @@ jobs:
       - name: Colombo Consumer Price Index (DCS)
         if: always()
         run: python scripts/build_ccpi.py
+      - name: Official economy series (CBSL statistical tables)
+        if: always()
+        run: |
+          pip install -q openpyxl
+          python scripts/build_economy.py
       - name: Lanka Metro route lines
         if: always()
         run: python scripts/build_metro.py
@@ -46,6 +51,6 @@ jobs:
       - name: Refresh jsDelivr CDN cache
         if: always()
         run: |
-          for f in enso.json outlook-3m.json status.json epidemiology.json metro-routes.json ccpi.json; do
+          for f in enso.json outlook-3m.json status.json epidemiology.json metro-routes.json ccpi.json economy.json; do
             curl -s -o /dev/null -w "$f %{http_code}\n" "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
           done

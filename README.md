@@ -18,6 +18,7 @@ calling many APIs from their browser.
 | `data/fuel-history.json` | hourly check | Ceylon Petroleum Corporation price revisions since 2015 (petrol 92/95, auto and super diesel, kerosene) |
 | `data/ccpi.json` | daily check | Colombo Consumer Price Index from January 2016, monthly: index (2021 = 100; the 2013-base series is linked at December 2022) and year-on-year inflation, Department of Census and Statistics |
 | `data/news.json` | hourly | Latest 60 headlines merged from Ada Derana, Daily Mirror, The Island, Newswire, ColomboPage, OnLanka and Tamil Guardian RSS feeds (title, link, time, source) |
+| `data/economy.json` | daily check | Central Bank of Sri Lanka statistical tables: monthly policy rate (OPR/SDFR/SLFR), T-bill yields, AWPR, AWDR; official reserves; monthly workers' remittances and tourism earnings; monthly exports and imports; quarterly real GDP growth; quarterly unemployment (DCS Labour Force Survey) |
 | `data/tourism.json` | hourly check | SLTDA weekly report: tourist arrivals by month (this year, last year, 2018) and top twenty source markets this year; US State Department travel advisory level for Sri Lanka |
 | `data/metro-routes.json` | daily check | Lanka Metro Transit route lines and stops (Makumbura–Colombo, Makumbura–Kadawatha) for the SmartMetro map |
 | `data/status.json` | daily | When the daily files were last refreshed (each file also carries its own `generated` time) |
