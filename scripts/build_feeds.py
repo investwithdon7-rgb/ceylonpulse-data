@@ -1,4 +1,4 @@
-"""Hourly CeylonPulse feeds -> data/fuel.json, fuel-history.json, reservoirs.json, rivers.json, fires.json
+"""Hourly CeylonPulse feeds -> data/fuel.json, fuel-history.json, reservoirs.json, rivers.json, cse.json, fires.json
 
 Sources that block browser proxies but answer a normal server request:
   * Fuel prices: Ceylon Petroleum Corporation (ceypetco.gov.lk), plus its price
@@ -227,6 +227,37 @@ def rivers():
             'units': 'm', 'gauges': out}
 
 
+# ── Colombo Stock Exchange indices (ASPI, S&P SL20) ─────────────────
+CSE_API = 'https://www.cse.lk/api/'
+
+
+def cse_post(path, body=''):
+    r = subprocess.run(['curl', '-sS', '--fail', '-m', '40', '-A', UA, '-X', 'POST',
+                        '-H', 'Content-Type: application/x-www-form-urlencoded', '-d', body, CSE_API + path], capture_output=True)
+    try:
+        return json.loads(r.stdout) if r.returncode == 0 and r.stdout else None
+    except ValueError:
+        return None
+
+
+def cse():
+    """Latest ASPI and S&P SL20 plus one year of daily closes (TradingView has no SL20 feed)."""
+    out = {}
+    for key, latest, chart_id in (('aspi', 'aspiData', 1), ('sl20', 'snpData', 40)):
+        now = cse_post(latest)
+        hist = cse_post('chartData', f'chartId={chart_id}&period=5')
+        if not now or not now.get('value'):
+            return None
+        series = [[dt.datetime.fromtimestamp(p['d'] / 1000, COLOMBO).date().isoformat(), p['v']] for p in (hist or []) if p.get('v')]
+        out[key] = {
+            'value': now['value'], 'change': now.get('change'), 'pct': round(now.get('percentage') or 0, 2),
+            'high': now.get('highValue'), 'low': now.get('lowValue'),
+            'time': dt.datetime.fromtimestamp(now['timestamp'] / 1000, dt.timezone.utc).isoformat(timespec='minutes'),
+            'history': series[-260:],
+        }
+    return {'source': 'Colombo Stock Exchange', 'url': 'https://www.cse.lk/', **out}
+
+
 # ── NASA FIRMS fires ───────────────────────────────────────────────
 def fires():
     key = os.environ.get('FIRMS_KEY')
@@ -255,7 +286,7 @@ def fires():
 def main():
     os.makedirs(DATA, exist_ok=True)
     failed = []
-    for name, fn in (('fuel.json', fuel), ('fuel-history.json', fuel_history), ('reservoirs.json', reservoirs), ('rivers.json', rivers), ('fires.json', fires)):
+    for name, fn in (('fuel.json', fuel), ('fuel-history.json', fuel_history), ('reservoirs.json', reservoirs), ('rivers.json', rivers), ('cse.json', cse), ('fires.json', fires)):
         try:
             payload = fn()
         except Exception as e:
