@@ -28,6 +28,9 @@ jobs:
         run: |
           pip install -q pypdf
           python scripts/build_epid.py
+      - name: Lanka Metro route lines
+        if: always()
+        run: python scripts/build_metro.py
       - name: Commit updated data
         if: always()
         run: |
@@ -40,6 +43,6 @@ jobs:
       - name: Refresh jsDelivr CDN cache
         if: always()
         run: |
-          for f in enso.json outlook-3m.json status.json epidemiology.json; do
+          for f in enso.json outlook-3m.json status.json epidemiology.json metro-routes.json; do
             curl -s -o /dev/null -w "$f %{http_code}\n" "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
           done

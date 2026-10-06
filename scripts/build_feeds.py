@@ -1,7 +1,8 @@
-"""Hourly CeylonPulse feeds -> data/fuel.json, reservoirs.json, rivers.json, fires.json
+"""Hourly CeylonPulse feeds -> data/fuel.json, fuel-history.json, reservoirs.json, rivers.json, fires.json
 
 Sources that block browser proxies but answer a normal server request:
-  * Fuel prices: Ceylon Petroleum Corporation (ceypetco.gov.lk)
+  * Fuel prices: Ceylon Petroleum Corporation (ceypetco.gov.lk), plus its price
+    revisions since 2015 (historical-prices page)
   * Major reservoir storage: Irrigation Department daily sheet (Water Management Branch)
   * River gauges: Irrigation Department hydrometric network (ArcGIS feature service)
   * Fire detections: NASA FIRMS VIIRS (key from the FIRMS_KEY secret)
@@ -18,6 +19,7 @@ UA = 'Mozilla/5.0 (compatible; CeylonPulse-data/1.0; +https://github.com/investw
 COLOMBO = dt.timezone(dt.timedelta(hours=5, minutes=30))
 
 FUEL_URL = 'https://ceypetco.gov.lk/marketing-sales/'
+FUEL_HISTORY_URL = 'https://ceypetco.gov.lk/historical-prices/'
 RES_SHEET = ('https://docs.google.com/spreadsheets/d/e/2PACX-1vTcSGhi9RESl7CMCl1TQnrKe07Gx5Q696YiSB9jneIHqIP9lifpqSErgI3D5k9KtQXSdW5JpycIIr5e/'
              'pub?output=csv')
 GAUGES = 'https://services3.arcgis.com/J7ZFXmR8rSmQ3FGf/arcgis/rest/services/gauges_2_view/FeatureServer/0/query'
@@ -89,6 +91,38 @@ def fuel():
         print('fuel: page layout changed or prices implausible; keeping previous file')
         return None
     return out
+
+
+# ── Fuel price history (CPC revisions since 2015) ─────────────
+FUEL_COLS = {'LP 95': 'petrol95', 'LP 92': 'petrol92', 'LAD': 'diesel', 'LSD': 'superDiesel', 'LK': 'kerosene'}
+
+
+def fuel_history():
+    page = get(FUEL_HISTORY_URL)
+    if not page:
+        return None
+    t = re.sub(r'(?is)<(script|style).*?</\1>', ' ', page)
+    cell = lambda c: re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', c))).strip()
+    for table in re.findall(r'(?is)<table.*?</table>', t):
+        rows = [[cell(c) for c in re.findall(r'(?is)<t[hd].*?</t[hd]>', r)] for r in re.findall(r'(?is)<tr.*?</tr>', table)]
+        if not rows or rows[0][:3] != ['Date', 'LP 95', 'LP 92']:
+            continue  # the second table is the pre-2006 per-circular list
+        idx = {k: rows[0].index(k) for k in FUEL_COLS if k in rows[0]}
+        out = []
+        for r in rows[1:]:
+            m = re.match(r'(\d{2})\.(\d{2})\.(\d{4})$', r[0])
+            if not m:
+                continue
+            out.append([f'{m.group(3)}-{m.group(2)}-{m.group(1)}'] + [num(r[idx[k]]) if k in idx and idx[k] < len(r) else None for k in FUEL_COLS])
+        out.sort()
+        # Keep 2015 onwards, plus the revision in force on 1 Jan 2015
+        before = [r for r in out if r[0] < '2015-01-01']
+        out = before[-1:] + [r for r in out if r[0] >= '2015-01-01']
+        if len(out) < 20:
+            return None  # table layout changed; keep the previous file
+        return {'source': 'Ceylon Petroleum Corporation — historical prices', 'url': FUEL_HISTORY_URL, 'units': 'LKR per litre',
+                'columns': ['date'] + list(FUEL_COLS.values()), 'revisions': out}
+    return None
 
 
 # ── Major reservoirs (Irrigation Department daily sheet) ───────────
@@ -221,7 +255,7 @@ def fires():
 def main():
     os.makedirs(DATA, exist_ok=True)
     failed = []
-    for name, fn in (('fuel.json', fuel), ('reservoirs.json', reservoirs), ('rivers.json', rivers), ('fires.json', fires)):
+    for name, fn in (('fuel.json', fuel), ('fuel-history.json', fuel_history), ('reservoirs.json', reservoirs), ('rivers.json', rivers), ('fires.json', fires)):
         try:
             payload = fn()
         except Exception as e:

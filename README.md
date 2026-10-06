@@ -14,6 +14,10 @@ calling many APIs from their browser.
 | `data/rivers.json` | hourly | Latest reading at each Irrigation Department river gauge with alert / minor / major flood levels |
 | `data/fires.json` | hourly | NASA FIRMS VIIRS fire detections over Sri Lanka, last 3 days |
 | `data/epidemiology.json` | daily check | Epidemiology Unit Weekly Epidemiological Report, Table 1: weekly and year-to-date dengue, leptospirosis and other notifiable diseases by RDHS. National figures are the sum of districts (the printed national row is occasionally wrong) |
+| `data/prices.json` | hourly check | Central Bank Daily Price Report: wholesale and retail prices of ~40 foods (vegetables, rice, fish, fruit, staples) at Pettah, Dambulla, Narahenpita, Marandagahamula, Peliyagoda and Negombo, the day's biggest moves with CBSL's reasons, and up to a year of Colombo retail history for a 20-food basket. PDFs are read in memory and never stored; every report is kept as compact values in one file per year, `archive/prices/YYYY.json` (back to September 2025) |
+| `data/fuel-history.json` | hourly check | Ceylon Petroleum Corporation price revisions since 2015 (petrol 92/95, auto and super diesel, kerosene) |
+| `data/tourism.json` | hourly check | SLTDA weekly report: tourist arrivals by month (this year, last year, 2018) and top twenty source markets this year; US State Department travel advisory level for Sri Lanka |
+| `data/metro-routes.json` | daily check | Lanka Metro Transit route lines and stops (Makumbura–Colombo, Makumbura–Kadawatha) for the SmartMetro map |
 | `data/status.json` | daily | When the daily files were last refreshed (each file also carries its own `generated` time) |
 | `archive/` | every run | Dated copies of each forecast, kept so forecast accuracy can be checked later |
 
@@ -38,7 +42,7 @@ The hourly feeds rewrite a file only when its data changes, so `generated` is th
 
 ## Sources and licences
 
-NOAA Climate Prediction Center (public domain) · Irrigation Department of Sri Lanka · Epidemiology Unit, Ministry of Health · Ceylon Petroleum Corporation · NASA FIRMS · ECMWF SEAS5 and ERA5 via [Open-Meteo](https://open-meteo.com) (CC BY 4.0) ·
+NOAA Climate Prediction Center (public domain) · Irrigation Department of Sri Lanka · Epidemiology Unit, Ministry of Health · Ceylon Petroleum Corporation · Central Bank of Sri Lanka · Sri Lanka Tourism Development Authority · U.S. Department of State · Lanka Metro Transit · NASA FIRMS · ECMWF SEAS5 and ERA5 via [Open-Meteo](https://open-meteo.com) (CC BY 4.0) ·
 Copernicus Climate Change Service, C3S seasonal forecasts (generated using Copernicus Climate Change Service information;
 neither the European Commission nor ECMWF is responsible for any use that may be made of it) ·
 district boundaries from geoBoundaries / OpenStreetMap (ODbL).
