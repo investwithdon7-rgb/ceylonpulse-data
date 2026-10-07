@@ -31,6 +31,14 @@ jobs:
         run: |
           pip install -q openpyxl
           python scripts/build_agri.py
+      - name: Tourist attraction visitors (SLTDA Year in Review, annual)
+        if: always()
+        run: |
+          pip install -q pypdf
+          python scripts/build_tourism_sites.py
+      - name: Census 2024 and 2012 by district (DCS Census Data Portal)
+        if: always()
+        run: python scripts/build_census.py
       - name: Commit updated data
         if: always()
         run: |
@@ -41,6 +49,6 @@ jobs:
           git commit -m "Governance & agriculture series $(date -u +%Y-%m-%d)"
           git pull --rebase --autostash -X theirs
           git push
-          for f in governance.json agri.json compare.json; do
+          for f in governance.json agri.json compare.json tourism-sites.json census-districts.json; do
             curl -s -o /dev/null "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
           done
