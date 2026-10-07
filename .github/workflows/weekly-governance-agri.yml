@@ -1,0 +1,43 @@
+name: Weekly governance, digital & agriculture series
+
+on:
+  schedule:
+    - cron: '30 2 * * 1'   # Mondays 08:00 Sri Lanka time (Pink Sheet updates early each month)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-commit
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Governance scores (WGI, CPI, V-Dem) and UN e-government index
+        run: python scripts/build_governance.py
+      - name: Tea auction & commodity prices, FAOSTAT crops/livestock, fisheries & labour
+        if: always()
+        run: |
+          pip install -q openpyxl
+          python scripts/build_agri.py
+      - name: Commit updated data
+        if: always()
+        run: |
+          git config user.name "ceylonpulse-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git commit -m "Governance & agriculture series $(date -u +%Y-%m-%d)"
+          git pull --rebase --autostash -X theirs
+          git push
+          for f in governance.json agri.json; do
+            curl -s -o /dev/null "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
+          done

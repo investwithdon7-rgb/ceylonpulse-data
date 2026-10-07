@@ -1,8 +1,11 @@
-name: Hourly feeds (fuel, reservoirs, rivers, fires, prices, tourism, news)
+name: Hourly feeds (fuel, reservoirs, rivers, fires, prices, tourism, news, gazette)
 
 on:
   schedule:
     - cron: '20 * * * *'   # every hour at :20
+    # extra evening runs (17:20-22:20 Sri Lanka time): CBSL posts the daily price
+    # report in the evening and GitHub often delays busy :20 runs
+    - cron: '50 11-16 * * *'
   workflow_dispatch:
 
 permissions:
@@ -34,6 +37,9 @@ jobs:
       - name: News headlines (7 Sri Lankan RSS feeds)
         if: always()
         run: python scripts/build_news.py
+      - name: Government gazettes, bills and acts (documents.gov.lk)
+        if: always()
+        run: python scripts/build_gazette.py
       - name: Commit changed data
         if: always()
         run: |
