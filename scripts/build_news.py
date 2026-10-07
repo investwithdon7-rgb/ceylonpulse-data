@@ -4,6 +4,10 @@ Browsers can only reach these RSS feeds through slow public proxies (Ada Derana
 not at all), so the hourly job reads them directly and merges the latest
 headlines into one small file. Standard library only. If every feed fails the
 previous file is kept.
+
+topics.invest = investment headlines for the Invest section: a Google News
+search (browsers can't fetch it: rss2json refuses it, the proxies are slow)
+plus the Daily Mirror business feed, kept to titles matching INVEST_RE, 14 days.
 """
 import datetime as dt, email.utils, html, json, os, re, subprocess
 import xml.etree.ElementTree as ET
@@ -21,6 +25,17 @@ FEEDS = [
     ('Tamil Guardian', 'https://www.tamilguardian.com/rss.xml'),
 ]
 PER_FEED, KEEP = 12, 60
+GNEWS = 'https://news.google.com/rss/search?q={q}&hl=en-LK&gl=LK&ceid=LK:en'
+TOPICS = {
+    'invest': {
+        'feeds': [
+            ('Google News', GNEWS.format(q='sri+lanka+(BOI+OR+%22board+of+investment%22+OR+FDI+OR+%22foreign+investment%22+OR+%22Port+City%22+OR+%22investment+zone%22)+when:14d')),
+            ('Daily Mirror', 'https://www.dailymirror.lk/rss/business/215'),
+        ],
+        're': re.compile(r'\bBOI\b|board of investment|\bFDI\b|foreign (?:direct )?investment|investors?\b|investment (?:zone|project|agreement|approval|promotion|climate)|port city|special economic zone|\bEPZ\b|export processing zone|joint venture|bilateral investment|strategic development project', re.I),
+        'days': 14, 'keep': 12,
+    },
+}
 
 
 def fetch(url):
@@ -60,8 +75,34 @@ def parse(raw, source):
         link = (it.findtext('link') or '').strip()
         if not title or not link.startswith('http'):
             continue
-        out.append({'title': title, 'link': link, 'pubDate': when(it.findtext('pubDate')), 'source': source})
-    return out[:PER_FEED]
+        src = source
+        if source == 'Google News':
+            # Google titles end in " - Publisher"; the publisher is also in <source>
+            src = clean(it.findtext('source')) or source
+            if src != source and title.endswith(' - ' + src):
+                title = title[:-len(src) - 3]
+            else:
+                title = re.sub(r'\s+-\s+[^-]+$', '', title)
+        out.append({'title': title, 'link': link, 'pubDate': when(it.findtext('pubDate')), 'source': src})
+    return out if source == 'Google News' else out[:PER_FEED]
+
+
+def topic(cfg, now):
+    cutoff = (dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=cfg['days'])).isoformat(timespec='seconds')
+    items = []
+    for source, url in cfg['feeds']:
+        raw = fetch(url)
+        got = [i for i in (parse(raw, source) if raw else []) if cfg['re'].search(i['title'])]
+        print(f'  topic {source}: {len(got)}')
+        items += got
+    seen, out = set(), []
+    for i in sorted(items, key=lambda x: x['pubDate'] or '', reverse=True):
+        k = re.sub(r'\W+', ' ', i['title'].lower())[:70]
+        if k in seen or not i['pubDate'] or i['pubDate'] > now or i['pubDate'] < cutoff:
+            continue
+        seen.add(k)
+        out.append(i)
+    return out[:cfg['keep']]
 
 
 def main():
@@ -84,9 +125,12 @@ def main():
             continue
         seen.add(k)
         merged.append(i)
-    payload = {'sources': ok, 'items': merged[:KEEP]}
-    if os.path.exists(OUT):
-        old = json.load(open(OUT, encoding='utf-8'))
+    old = json.load(open(OUT, encoding='utf-8')) if os.path.exists(OUT) else {}
+    topics = {}
+    for name, cfg in TOPICS.items():
+        topics[name] = topic(cfg, now) or old.get('topics', {}).get(name, [])
+    payload = {'sources': ok, 'items': merged[:KEEP], 'topics': topics}
+    if old:
         old.pop('generated', None)
         if old == payload:
             print('news.json: unchanged')
