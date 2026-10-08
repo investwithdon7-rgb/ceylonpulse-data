@@ -39,6 +39,9 @@ jobs:
       - name: Lanka Metro route lines
         if: always()
         run: python scripts/build_metro.py
+      - name: Bank deposit & lending rates (CBSL weekly averages + bank rate pages)
+        if: always()
+        run: python scripts/build_bank_rates.py
       - name: Commit updated data
         if: always()
         run: |
@@ -51,6 +54,6 @@ jobs:
       - name: Refresh jsDelivr CDN cache
         if: always()
         run: |
-          for f in enso.json outlook-3m.json status.json epidemiology.json metro-routes.json ccpi.json economy.json; do
+          for f in enso.json outlook-3m.json status.json epidemiology.json metro-routes.json ccpi.json economy.json bank-rates.json; do
             curl -s -o /dev/null -w "$f %{http_code}\n" "https://purge.jsdelivr.net/gh/${{ github.repository }}@main/data/$f" || true
           done
