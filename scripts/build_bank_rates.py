@@ -38,8 +38,22 @@ def curl(url, jar=None, data=None, referer=None):
         cmd += ['-e', referer]
     if data is not None:
         cmd += ['--data', data]
+    # Browser-like headers: some bank sites refuse requests that only send a User-Agent
+    cmd += ['-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+            '-H', 'Accept-Language: en-US,en;q=0.9']
     r = subprocess.run(cmd + [url], capture_output=True)
     return r.stdout.decode('utf-8', 'replace') if r.returncode == 0 else None
+
+
+def probe(url):
+    """One line on what a page returned, for the log when a bank fails to parse."""
+    r = subprocess.run(['curl', '-sSL', '--compressed', '-m', '60', '-A', UA, '-o', '-', '-w', '\n@@%{http_code} %{size_download}B %{url_effective}', url],
+                       capture_output=True)
+    body, _, meta = r.stdout.decode('utf-8', 'replace').rpartition('\n@@')
+    title = re.search(r'<title[^>]*>(.*?)</title>', body, re.S | re.I)
+    text = clean(re.sub(r'<script.*?</script>|<style.*?</style>', ' ', body, flags=re.S))
+    return (f'HTTP {meta or "none"} curl-exit={r.returncode} {r.stderr.decode(errors="replace").strip()[:120]} | '
+            f'title: {clean(title.group(1))[:80] if title else "-"} | tables={len(re.findall(r"<table", body, re.I))} | text: {text[:160]}')
 
 
 def clean(x):
@@ -235,11 +249,13 @@ def main():
             banks.append({'id': bid, 'name': name, 'short': short, 'owner': owner, 'url': url, 'checked': today,
                           'effective': got['effective'], 'fd': fd, 'savings': got['savings'], 'savingsLabel': got['savingsLabel']})
             print(f'  {short}: {len(fd)} terms, effective {got["effective"]}, savings {got["savings"]}')
-        elif bid in prev_banks:
-            banks.append(prev_banks[bid])
-            print(f'  {short}: parse failed, kept entry checked {prev_banks[bid]["checked"]}')
         else:
-            print(f'  {short}: parse failed, no previous entry')
+            print(f'  {short}: page check -> {probe(url)}')
+            if bid in prev_banks:
+                banks.append(prev_banks[bid])
+                print(f'  {short}: parse failed, kept entry checked {prev_banks[bid]["checked"]}')
+            else:
+                print(f'  {short}: parse failed, no previous entry')
 
     if not banks and not cbsl:
         raise SystemExit('nothing parsed; keeping previous file')
