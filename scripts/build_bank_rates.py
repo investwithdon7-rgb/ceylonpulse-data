@@ -198,6 +198,9 @@ BANKS = [
     ('seylan', 'Seylan Bank', 'Seylan', 'private', 'https://www.seylan.lk/interest-rates', seylan),
     ('sdb', 'SDB bank', 'SDB', 'private', 'https://www.sdb.lk/en/rates?tableid=5', sdb),
 ]
+# Behind a CloudFront firewall that returns 403 to GitHub Actions and other cloud hosts:
+# refreshed from a home PC by local_bank_rates.py (1st and 15th of each month)
+LOCAL_ONLY = {'boc', 'commercial'}
 NOT_COVERED = ['HNB', 'Sampath Bank', 'National Savings Bank', 'DFCC Bank', 'NDB Bank', 'Nations Trust Bank']
 
 
@@ -237,7 +240,13 @@ def main():
     print('cbsl:', len(cbsl['weeks']) if cbsl else 'FAILED', 'weeks')
 
     banks = []
+    in_actions = os.environ.get('GITHUB_ACTIONS') == 'true'
     for bid, name, short, owner, url, reader in BANKS:
+        if in_actions and bid in LOCAL_ONLY:
+            if bid in prev_banks:
+                banks.append(prev_banks[bid])
+                print(f'  {short}: refreshed from the home PC; kept entry checked {prev_banks[bid]["checked"]}')
+            continue
         page = curl(url)
         got = None
         try:
