@@ -35,6 +35,17 @@ TOPICS = {
         're': re.compile(r'\bBOI\b|board of investment|\bFDI\b|foreign (?:direct )?investment|investors?\b|investment (?:zone|project|agreement|approval|promotion|climate)|port city|special economic zone|\bEPZ\b|export processing zone|joint venture|bilateral investment|strategic development project', re.I),
         'days': 14, 'keep': 12,
     },
+    # Safety & Justice: scam, fraud and phishing warnings (CERT, CBSL, police)
+    'scam': {
+        'feeds': [
+            ('Google News', GNEWS.format(q='sri+lanka+(scam+OR+fraud+OR+phishing+OR+%22pyramid+scheme%22+OR+%22Sri+Lanka+CERT%22+OR+%22unauthorised+deposit%22)+when:30d')),
+        ],
+        're': re.compile(r'scam|fraud|phishing|swindl|pyramid scheme|ponzi|fake (?:link|website|message|sms|app|job|account|page)|cyber ?crime|unauthori[sz]ed (?:deposit|financial)|impersonat', re.I),
+        # must read as a warning to the public, not a fraud arrest or court case
+        'need': re.compile(r'warn|alert|beware|caution|urge[ds]?|vigilan|advis|be careful|fake|impersonat|don.t|do not|how to', re.I),
+        'skip': re.compile(r'\b(India|Indian|Thai|Thailand|Japan|Malaysia|Singapore|Philippines|Cambodia|Myanmar|Pakistan|Bangladesh|Nepal|UAE|Dubai)\b', re.I),
+        'days': 30, 'keep': 10,
+    },
 }
 
 
@@ -92,7 +103,9 @@ def topic(cfg, now):
     items = []
     for source, url in cfg['feeds']:
         raw = fetch(url)
-        got = [i for i in (parse(raw, source) if raw else []) if cfg['re'].search(i['title'])]
+        got = [i for i in (parse(raw, source) if raw else []) if cfg['re'].search(i['title'])
+               and ('need' not in cfg or cfg['need'].search(i['title']))
+               and ('skip' not in cfg or not cfg['skip'].search(i['title']))]
         print(f'  topic {source}: {len(got)}')
         items += got
     seen, out = set(), []
