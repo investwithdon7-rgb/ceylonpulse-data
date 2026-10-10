@@ -34,7 +34,11 @@ def get(url, tries=3, timeout=60):
                            capture_output=True)
         if r.returncode == 0 and r.stdout:
             return r.stdout.decode('utf-8', errors='replace')
-        print(f'  retry {i + 1} {url[:70]}: {r.stderr.decode(errors="replace").strip()[:120]}')
+        err = r.stderr.decode(errors='replace').strip()
+        key = os.environ.get('FIRMS_KEY')
+        if key:  # a truncated key slips past Actions' secret masking: redact before cutting
+            url, err = url.replace(key, '***'), err.replace(key, '***')
+        print(f'  retry {i + 1} {url[:70]}: {err[:120]}')
         time.sleep(10 * (i + 1))
     return None
 
