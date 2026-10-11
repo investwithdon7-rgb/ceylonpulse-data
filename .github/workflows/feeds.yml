@@ -8,6 +8,8 @@ on:
     - cron: '50 11-16 * * *'
   workflow_dispatch:
 
+# Each build runs through scripts/health.py: a source that fails keeps its previous
+# file and shows a warning; the run goes red only after the feed's hour limit.
 permissions:
   contents: write
 
@@ -32,14 +34,14 @@ jobs:
         if: always()
         run: |
           pip install -q pypdf
-          python scripts/build_prices.py
-          python scripts/build_tourism.py
+          python scripts/health.py run prices 48 scripts/build_prices.py
+          python scripts/health.py run tourism 72 scripts/build_tourism.py
       - name: News headlines (7 Sri Lankan RSS feeds)
         if: always()
-        run: python scripts/build_news.py
+        run: python scripts/health.py run news 12 scripts/build_news.py
       - name: Government gazettes, bills and acts (documents.gov.lk)
         if: always()
-        run: python scripts/build_gazette.py
+        run: python scripts/health.py run gazette 48 scripts/build_gazette.py
       - name: Commit changed data
         if: always()
         run: |

@@ -5,6 +5,8 @@ on:
     - cron: '30 0 * * *'   # 06:00 Sri Lanka time
   workflow_dispatch:
 
+# Each build runs through scripts/health.py: a source that fails keeps its previous
+# file and shows a warning; the run goes red only after the feed's hour limit.
 permissions:
   contents: write
 
@@ -22,26 +24,26 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build ENSO status and 3-month outlook
-        run: python scripts/build_daily.py
+        run: python scripts/health.py run enso-outlook 50 scripts/build_daily.py
       - name: Weekly Epidemiological Report (new reports only)
         if: always()
         run: |
           pip install -q pypdf
-          python scripts/build_epid.py
+          python scripts/health.py run epidemiology 100 scripts/build_epid.py
       - name: Colombo Consumer Price Index (DCS)
         if: always()
-        run: python scripts/build_ccpi.py
+        run: python scripts/health.py run ccpi 100 scripts/build_ccpi.py
       - name: Official economy series (CBSL statistical tables)
         if: always()
         run: |
           pip install -q openpyxl
-          python scripts/build_economy.py
+          python scripts/health.py run economy 100 scripts/build_economy.py
       - name: Lanka Metro route lines
         if: always()
-        run: python scripts/build_metro.py
+        run: python scripts/health.py run metro 170 scripts/build_metro.py
       - name: Bank deposit & lending rates (CBSL weekly averages + bank rate pages)
         if: always()
-        run: python scripts/build_bank_rates.py
+        run: python scripts/health.py run bank-rates 100 scripts/build_bank_rates.py
       - name: Commit updated data
         if: always()
         run: |

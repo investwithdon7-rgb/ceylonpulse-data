@@ -13,6 +13,8 @@ kept. Standard library only.
 """
 import csv, datetime as dt, html, io, json, os, re, subprocess, sys, time
 
+import health
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA = os.path.join(ROOT, 'data')
 UA = 'Mozilla/5.0 (compatible; CeylonPulse-data/1.0; +https://github.com/investwithdon7-rgb/ceylonpulse-data)'
@@ -270,8 +272,11 @@ def fires():
         return None
     allf, ok = [], False
     for src in ('VIIRS_NOAA20_NRT', 'VIIRS_SNPP_NRT'):
-        text = get(f'https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/{src}/{FIRMS_BBOX}/{FIRMS_DAYS}')
-        if text is None or not text.startswith('latitude'):
+        text = get(f'https://firms.modaps.eosdis.nasa.gov/api/area/csv/{key}/{src}/{FIRMS_BBOX}/{FIRMS_DAYS}',
+                   tries=2, timeout=40)
+        if text is None:
+            break  # same server for both satellites: don't spend more of the job on a timeout
+        if not text.startswith('latitude'):
             continue
         ok = True
         for r in csv.DictReader(io.StringIO(text)):
@@ -287,16 +292,25 @@ def fires():
     return {'fires': allf, 'days': FIRMS_DAYS, 'source': 'NASA FIRMS · VIIRS 375 m (NOAA-20 + Suomi-NPP)'}
 
 
+# Hours a feed may keep failing (previous file kept, GitHub warning) before the run goes red
+MAX_HOURS = {'fuel.json': 48, 'fuel-history.json': 72, 'reservoirs.json': 36, 'rivers.json': 12,
+             'cse.json': 72, 'fires.json': 24}
+
+
 def main():
     os.makedirs(DATA, exist_ok=True)
-    failed = []
     for name, fn in (('fuel.json', fuel), ('fuel-history.json', fuel_history), ('reservoirs.json', reservoirs), ('rivers.json', rivers), ('cse.json', cse), ('fires.json', fires)):
+        if name == 'fires.json' and not os.environ.get('FIRMS_KEY'):
+            print('fires: FIRMS_KEY not set; skipping')
+            continue
+        error = 'source unavailable or page layout changed'
         try:
             payload = fn()
         except Exception as e:
             print(f'{name}: error {e}')
-            payload = None
+            payload, error = None, f'error {e}'
         if payload:
+            health.ok(name)
             save_if_changed(name, payload)
             if name == 'reservoirs.json':
                 # One copy per day builds the storage history behind the trend charts
@@ -305,12 +319,10 @@ def main():
                 day = dt.datetime.now(COLOMBO).date().isoformat()
                 json.dump(payload, open(os.path.join(arch, f'{day}.json'), 'w', encoding='utf-8'),
                           ensure_ascii=False, separators=(',', ':'))
-        elif name != 'fires.json' or os.environ.get('FIRMS_KEY'):
-            failed.append(name)
-    if failed:
-        print('Kept previous files for:', ', '.join(failed))
-        sys.exit(1)  # mark the run failed so a broken source is noticed
-
+        else:
+            print(f'{name}: kept previous file')
+            health.fail(name, error, MAX_HOURS[name])
+    health.finish()  # exits 1 only when a feed has been failing longer than its limit
 
 if __name__ == '__main__':
     main()

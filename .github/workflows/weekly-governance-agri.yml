@@ -5,6 +5,8 @@ on:
     - cron: '30 2 * * 1'   # Mondays 08:00 Sri Lanka time (Pink Sheet updates early each month)
   workflow_dispatch:
 
+# Each build runs through scripts/health.py: a source that fails keeps its previous
+# file and shows a warning; the run goes red only after the feed's hour limit.
 permissions:
   contents: write
 
@@ -22,23 +24,23 @@ jobs:
         with:
           python-version: '3.12'
       - name: Governance scores (WGI, CPI, V-Dem) and UN e-government index
-        run: python scripts/build_governance.py
+        run: python scripts/health.py run governance 160 scripts/build_governance.py
       - name: Country comparison (World Bank actuals + IMF WEO projections)
         if: always()
-        run: python scripts/build_compare.py
+        run: python scripts/health.py run compare 160 scripts/build_compare.py
       - name: Tea auction & commodity prices, FAOSTAT crops/livestock, fisheries & labour
         if: always()
         run: |
           pip install -q openpyxl
-          python scripts/build_agri.py
+          python scripts/health.py run agri 160 scripts/build_agri.py
       - name: Tourist attraction visitors (SLTDA Year in Review, annual)
         if: always()
         run: |
           pip install -q pypdf
-          python scripts/build_tourism_sites.py
+          python scripts/health.py run tourism-sites 160 scripts/build_tourism_sites.py
       - name: Census 2024 and 2012 by district (DCS Census Data Portal)
         if: always()
-        run: python scripts/build_census.py
+        run: python scripts/health.py run census 160 scripts/build_census.py
       - name: Commit updated data
         if: always()
         run: |

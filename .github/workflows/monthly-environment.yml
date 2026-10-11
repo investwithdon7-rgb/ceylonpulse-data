@@ -5,6 +5,8 @@ on:
     - cron: '0 3 2 * *'   # 2nd of each month, 08:30 Sri Lanka time
   workflow_dispatch:
 
+# Each build runs through scripts/health.py: a source that fails keeps its previous
+# file and shows a warning; the run goes red only after the feed's hour limit.
 permissions:
   contents: write
 
@@ -22,7 +24,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Build CO2, renewables, forest and ERA5 climate record
-        run: python scripts/build_environment.py
+        run: python scripts/health.py run environment 700 scripts/build_environment.py
       - name: Commit updated data
         run: |
           git config user.name "ceylonpulse-bot"
