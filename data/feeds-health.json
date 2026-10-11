@@ -1,0 +1,8 @@
+{
+ "economy": {
+  "failingSince": "2026-10-11T04:00:20+00:00",
+  "lastChecked": "2026-10-11T04:00:20+00:00",
+  "lastError": "rates: kept previous; reserves: kept previous; remittances: kept previous; tourismEarnings: kept previous; gdpGrowth: kept previous; unemployment: kept previous",
+  "maxHours": 100
+ }
+}
