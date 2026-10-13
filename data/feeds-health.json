@@ -4,11 +4,5 @@
   "lastChecked": "2026-10-13T06:55:35+00:00",
   "lastError": "rates: kept previous; reserves: kept previous; remittances: kept previous; tourismEarnings: kept previous; gdpGrowth: kept previous; unemployment: kept previous",
   "maxHours": 100
- },
- "fires.json": {
-  "failingSince": "2026-10-13T07:49:18+00:00",
-  "lastChecked": "2026-10-13T07:49:18+00:00",
-  "lastError": "source unavailable or page layout changed",
-  "maxHours": 24
  }
 }
