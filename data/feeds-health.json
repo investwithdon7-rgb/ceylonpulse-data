@@ -1,8 +1,14 @@
 {
  "economy": {
   "failingSince": "2026-10-11T04:00:20+00:00",
-  "lastChecked": "2026-10-13T06:55:35+00:00",
+  "lastChecked": "2026-10-14T05:07:25+00:00",
   "lastError": "rates: kept previous; reserves: kept previous; remittances: kept previous; tourismEarnings: kept previous; gdpGrowth: kept previous; unemployment: kept previous",
+  "maxHours": 100
+ },
+ "epidemiology": {
+  "failingSince": "2026-10-14T05:07:06+00:00",
+  "lastChecked": "2026-10-14T05:07:06+00:00",
+  "lastError": "exit 1: fetch failed https://www.epid.gov.lk/weekly-epidemiological-report curl: (22) The requested URL returned error: 500",
   "maxHours": 100
  }
 }
