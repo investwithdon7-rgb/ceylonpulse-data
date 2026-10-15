@@ -10,17 +10,5 @@
   "lastChecked": "2026-10-14T05:07:06+00:00",
   "lastError": "exit 1: fetch failed https://www.epid.gov.lk/weekly-epidemiological-report curl: (22) The requested URL returned error: 500",
   "maxHours": 100
- },
- "fuel-history.json": {
-  "failingSince": "2026-10-14T15:59:22+00:00",
-  "lastChecked": "2026-10-14T15:59:22+00:00",
-  "lastError": "source unavailable or page layout changed",
-  "maxHours": 72
- },
- "fuel.json": {
-  "failingSince": "2026-10-14T15:59:21+00:00",
-  "lastChecked": "2026-10-14T15:59:21+00:00",
-  "lastError": "source unavailable or page layout changed",
-  "maxHours": 48
  }
 }
