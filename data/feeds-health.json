@@ -13,13 +13,13 @@
  },
  "fuel-history.json": {
   "failingSince": "2026-10-15T10:01:07+00:00",
-  "lastChecked": "2026-10-16T01:26:36+00:00",
+  "lastChecked": "2026-10-17T04:36:21+00:00",
   "lastError": "source unavailable or page layout changed",
   "maxHours": 72
  },
  "fuel.json": {
   "failingSince": "2026-10-15T10:01:06+00:00",
-  "lastChecked": "2026-10-16T01:26:35+00:00",
+  "lastChecked": "2026-10-17T04:36:20+00:00",
   "lastError": "source unavailable or page layout changed",
   "maxHours": 48
  }
