@@ -211,6 +211,7 @@ def unemployment():
 def main():
     old = json.load(open(OUT, encoding='utf-8')) if os.path.exists(OUT) else {}
     old.pop('generated', None)
+    old.pop('checked', None)  # set by scripts/local_refresh.py
     payload = dict(old)
     parts = {
         'rates': interest_rates,

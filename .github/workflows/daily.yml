@@ -37,7 +37,7 @@ jobs:
         if: always()
         run: |
           pip install -q openpyxl
-          python scripts/health.py run economy 100 scripts/build_economy.py
+          python scripts/health.py run economy 100 --local economy.json:36 scripts/build_economy.py
       - name: Lanka Metro route lines
         if: always()
         run: python scripts/health.py run metro 170 scripts/build_metro.py

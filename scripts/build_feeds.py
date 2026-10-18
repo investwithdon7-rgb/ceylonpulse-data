@@ -59,7 +59,7 @@ def save_if_changed(name, payload):
     if os.path.exists(path):
         old = json.load(open(path, encoding='utf-8'))
         old.pop('generated', None)
-        old.pop('checked', None)  # set by scripts/local_fuel.py
+        old.pop('checked', None)  # set by scripts/local_refresh.py
         if old == payload:
             print(f'{name}: unchanged')
             return
@@ -310,7 +310,7 @@ def fires():
 # Hours a feed may keep failing (previous file kept, GitHub warning) before the run goes red
 MAX_HOURS = {'fuel.json': 48, 'fuel-history.json': 72, 'reservoirs.json': 36, 'rivers.json': 12,
              'cse.json': 72, 'fires.json': 24}
-# Ceypetco's API only answers Sri Lankan connections: scripts/local_fuel.py uploads the fuel
+# Ceypetco's API only answers Sri Lankan connections: scripts/local_refresh.py uploads the fuel
 # files from a home PC and stamps fuel.json `checked`; a copy that recent counts as up to date
 LOCAL_OK_HOURS = 36
 

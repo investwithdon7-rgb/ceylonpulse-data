@@ -12,9 +12,11 @@ starts or stops failing (or once a day while it keeps failing), so it adds no
 hourly commits.
 
 Use from Python (build_feeds.py) with ok()/fail()/finish(), or wrap any script:
-  python scripts/health.py run FEED MAX_HOURS scripts/build_x.py [args]
+  python scripts/health.py run FEED MAX_HOURS [--local FILE:HOURS] scripts/build_x.py [args]
 A wrapped script counts as failing when it exits non-zero or prints one of the
 "kept previous" messages the build scripts use when a source fails.
+--local: the source refuses GitHub, and scripts/local_refresh.py uploads data/FILE
+from a home PC with a `checked` time; a copy checked within HOURS counts as OK.
 """
 import datetime as dt, json, os, re, subprocess, sys
 
@@ -67,11 +69,26 @@ def finish():
     sys.exit(1 if stale else 0)
 
 
-def run(feed, max_hours, cmd):
+def local_age(name):
+    """Hours since scripts/local_refresh.py last confirmed data/<name>, or None."""
+    try:
+        checked = json.load(open(os.path.join(ROOT, 'data', name), encoding='utf-8'))['checked']
+        return (_now() - dt.datetime.fromisoformat(checked)).total_seconds() / 3600
+    except (OSError, KeyError, ValueError):
+        return None
+
+
+def run(feed, max_hours, cmd, local=None):
     r = subprocess.run([sys.executable, *cmd], capture_output=True, text=True, encoding='utf-8', errors='replace')
     out = (r.stdout or '') + (r.stderr or '')
     print(out, end='' if out.endswith('\n') or not out else '\n')
     soft = [l.strip() for l in out.splitlines() if SOFT_FAIL.search(l)]
+    if (r.returncode != 0 or soft) and local:
+        name, hours = local.split(':')
+        age = local_age(name)
+        if age is not None and age < float(hours):
+            print(f'{feed}: refused from GitHub; home PC copy of {name} checked {age:.1f} h ago')
+            soft, r.returncode = [], 0
     if r.returncode != 0:
         tail = [l.strip() for l in out.splitlines() if l.strip()][-1:] or ['']
         fail(feed, f'exit {r.returncode}: {tail[0]}', max_hours)
@@ -86,4 +103,7 @@ if __name__ == '__main__':
     if len(sys.argv) < 5 or sys.argv[1] != 'run':
         sys.exit('usage: health.py run FEED MAX_HOURS script.py [args]')
     hours = float(sys.argv[3])
-    run(sys.argv[2], int(hours) if hours.is_integer() else hours, sys.argv[4:])
+    args, local = sys.argv[4:], None
+    if args[0] == '--local':
+        local, args = args[1], args[2:]
+    run(sys.argv[2], int(hours) if hours.is_integer() else hours, args, local)
