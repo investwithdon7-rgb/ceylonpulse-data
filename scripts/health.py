@@ -5,11 +5,12 @@ build scripts then keep the previous file, so the site stays up, and that is
 reported as a GitHub warning. The run fails only once a feed has been failing
 for longer than its `max_hours`.
 
-State lives in data/feeds-health.json:
-  {feed: {"failingSince": ISO time, "lastError": str, "maxHours": n, "lastChecked": ISO time}}
-Only failing feeds are listed, and the file is rewritten only when a feed
-starts or stops failing (or once a day while it keeps failing), so it adds no
-hourly commits.
+State lives in data/health/<feed>.json, one file per failing feed:
+  {"feed": name, "failingSince": ISO time, "lastError": str, "maxHours": n, "lastChecked": ISO time}
+A file exists only while its feed is failing and is rewritten only when the
+error changes (or once a day), so it adds no hourly commits. One file per feed
+means two workflows committing at the same time never overwrite each
+other's state.
 
 Use from Python (build_feeds.py) with ok()/fail()/finish(), or wrap any script:
   python scripts/health.py run FEED MAX_HOURS [--local FILE:HOURS] scripts/build_x.py [args]
@@ -21,11 +22,10 @@ from a home PC with a `checked` time; a copy checked within HOURS counts as OK.
 import datetime as dt, json, os, re, subprocess, sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PATH = os.path.join(ROOT, 'data', 'feeds-health.json')
+DIR = os.path.join(ROOT, 'data', 'health')
+LEGACY = os.path.join(ROOT, 'data', 'feeds-health.json')   # single-file state used until 18 Oct 2026
 SOFT_FAIL = re.compile(r'(?i)keeping previous|kept previous')
 
-_state = json.load(open(PATH, encoding='utf-8')) if os.path.exists(PATH) else {}
-_orig = json.dumps(_state, sort_keys=True)
 _seen = {}
 
 
@@ -33,32 +33,46 @@ def _now():
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
 
 
+def _path(feed):
+    return os.path.join(DIR, re.sub(r'\.json$', '', feed) + '.json')
+
+
+def _load(feed):
+    if os.path.exists(LEGACY):   # move the old single file into per-feed files once
+        os.makedirs(DIR, exist_ok=True)
+        for f, e in json.load(open(LEGACY, encoding='utf-8')).items():
+            if not os.path.exists(_path(f)):
+                json.dump({'feed': f, **e}, open(_path(f), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, sort_keys=True)
+        os.remove(LEGACY)
+    p = _path(feed)
+    return json.load(open(p, encoding='utf-8')) if os.path.exists(p) else None
+
+
 def ok(feed):
-    _seen[feed] = True
-    _state.pop(feed, None)
+    _seen[feed] = None
+    if _load(feed) is not None:
+        os.remove(_path(feed))
 
 
 def fail(feed, error, max_hours):
-    _seen[feed] = False
     now = _now().isoformat()
-    e = _state.setdefault(feed, {'failingSince': now})
+    old = _load(feed)
+    e = dict(old or {'feed': feed, 'failingSince': now})
     e['maxHours'] = max_hours
     if e.get('lastError') != error[:300] or e.get('lastChecked', '')[:10] != now[:10]:
         e['lastError'], e['lastChecked'] = error[:300], now
+    if e != old:
+        os.makedirs(DIR, exist_ok=True)
+        json.dump(e, open(_path(feed), 'w', encoding='utf-8'), ensure_ascii=False, indent=1, sort_keys=True)
+    _seen[feed] = e
 
 
 def finish():
-    """Save state, report this run's failing feeds, and exit 1 only if one is stale."""
-    if json.dumps(_state, sort_keys=True) != _orig:
-        if _state:
-            json.dump(_state, open(PATH, 'w', encoding='utf-8'), ensure_ascii=False, indent=1, sort_keys=True)
-        elif os.path.exists(PATH):
-            os.remove(PATH)
+    """Report this run's failing feeds, and exit 1 only if one is stale."""
     stale = []
-    for feed, good in _seen.items():
-        if good:
+    for feed, e in _seen.items():
+        if e is None:
             continue
-        e = _state[feed]
         hours = (_now() - dt.datetime.fromisoformat(e['failingSince'])).total_seconds() / 3600
         msg = f"{feed}: failing for {hours:.1f} h (limit {e['maxHours']} h), previous data kept - {e['lastError']}"
         if hours >= e['maxHours']:
