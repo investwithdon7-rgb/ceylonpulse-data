@@ -59,6 +59,7 @@ def save_if_changed(name, payload):
     if os.path.exists(path):
         old = json.load(open(path, encoding='utf-8'))
         old.pop('generated', None)
+        old.pop('checked', None)  # set by scripts/local_fuel.py
         if old == payload:
             print(f'{name}: unchanged')
             return
@@ -73,7 +74,7 @@ FUEL_API = 'https://api.ceypetco.gov.lk/api/admin/'
 
 
 def fuel_api(path):
-    raw = get(FUEL_API + path)
+    raw = get(FUEL_API + path, tries=2, timeout=30)
     data = json.loads(raw).get('data') if raw else None
     return data if isinstance(data, list) else None
 
@@ -309,6 +310,20 @@ def fires():
 # Hours a feed may keep failing (previous file kept, GitHub warning) before the run goes red
 MAX_HOURS = {'fuel.json': 48, 'fuel-history.json': 72, 'reservoirs.json': 36, 'rivers.json': 12,
              'cse.json': 72, 'fires.json': 24}
+# Ceypetco's API only answers Sri Lankan connections: scripts/local_fuel.py uploads the fuel
+# files from a home PC and stamps fuel.json `checked`; a copy that recent counts as up to date
+LOCAL_OK_HOURS = 36
+
+
+def local_copy_age(name):
+    """Hours since the home PC last confirmed the fuel files, or None."""
+    if name not in ('fuel.json', 'fuel-history.json'):
+        return None
+    try:
+        checked = json.load(open(os.path.join(DATA, 'fuel.json'), encoding='utf-8'))['checked']
+        return (dt.datetime.now(dt.timezone.utc) - dt.datetime.fromisoformat(checked)).total_seconds() / 3600
+    except (OSError, KeyError, ValueError):
+        return None
 
 
 def main():
@@ -335,6 +350,9 @@ def main():
                 day = dt.datetime.now(COLOMBO).date().isoformat()
                 json.dump(payload, open(os.path.join(arch, f'{day}.json'), 'w', encoding='utf-8'),
                           ensure_ascii=False, separators=(',', ':'))
+        elif (age := local_copy_age(name)) is not None and age < LOCAL_OK_HOURS:
+            print(f'{name}: unreachable from GitHub; home PC copy checked {age:.1f} h ago')
+            health.ok(name)
         else:
             print(f'{name}: kept previous file')
             health.fail(name, error, MAX_HOURS[name])
