@@ -1,4 +1,4 @@
-"""Hourly CeylonPulse feeds -> data/fuel.json, fuel-history.json, reservoirs.json, rivers.json, cse.json, fires.json
+"""Daily CeylonPulse feeds -> data/fuel.json, fuel-history.json, reservoirs.json, rivers.json, cse.json, fires.json
 
 Sources that block browser proxies but answer a normal server request:
   * Fuel prices: Ceylon Petroleum Corporation (ceypetco.gov.lk), plus its price
@@ -307,9 +307,10 @@ def fires():
     return {'fires': allf, 'days': FIRMS_DAYS, 'source': 'NASA FIRMS · VIIRS 375 m (NOAA-20 + Suomi-NPP)'}
 
 
-# Hours a feed may keep failing (previous file kept, GitHub warning) before the run goes red
-MAX_HOURS = {'fuel.json': 48, 'fuel-history.json': 72, 'reservoirs.json': 36, 'rivers.json': 12,
-             'cse.json': 72, 'fires.json': 24}
+# Hours a feed may keep failing (previous file kept, GitHub warning) before the run goes red.
+# The workflow runs once a day, so 50 h = red on the third missed day in a row
+MAX_HOURS = {'fuel.json': 50, 'fuel-history.json': 74, 'reservoirs.json': 50, 'rivers.json': 50,
+             'cse.json': 74, 'fires.json': 50}
 # Ceypetco's API only answers Sri Lankan connections: scripts/local_refresh.py uploads the fuel
 # files from a home PC and stamps fuel.json `checked`; a copy that recent counts as up to date
 LOCAL_OK_HOURS = 36

@@ -2,12 +2,15 @@
 
   * Fuel (every run): Ceypetco's price API (api.ceypetco.gov.lk) only answers
     Sri Lankan connections since Oct 2026 -> data/fuel.json, fuel-history.json
-  * Economy (once a day): cbsl.gov.lk answers GitHub Actions with HTTP 403
-    since Oct 2026 -> data/economy.json (same build_economy.py readers)
+  * Economy: cbsl.gov.lk answers GitHub Actions with HTTP 403 since Oct 2026
+    -> data/economy.json (same build_economy.py readers)
+  * CBSL Daily Price Report (same block) -> data/prices.json, archive/prices/YYYY.json
 
-Runs from Windows Task Scheduler every 3 hours ("CeylonPulse home refresh")
+Runs from Windows Task Scheduler daily at 18:15 Sri Lanka time, an hour after
+CBSL usually posts the price report ("CeylonPulse home refresh"; a missed run
+starts when the PC is next on)
 and uploads with the GitHub API (`gh`), because plain git pushes are blocked on
-that PC. fuel.json and economy.json get a `checked` time: the GitHub workflows
+that PC. fuel.json, economy.json and prices.json get a `checked` time: the GitHub workflows
 still try the sources themselves and, when refused, count a copy checked
 recently as up to date (build_feeds.LOCAL_OK_HOURS, health.py --local), so
 runs stay green while the PC keeps the data fresh. An unchanged file is
@@ -16,7 +19,7 @@ re-uploaded only twice a day, just to renew `checked`.
 Log: %LOCALAPPDATA%\\CeylonPulse\\home-refresh.log
 Run by hand: python scripts/local_refresh.py
 """
-import base64, contextlib, datetime as dt, io, json, os, subprocess, sys, tempfile
+import base64, contextlib, datetime as dt, io, json, os, re, shutil, subprocess, sys, tempfile
 
 if os.name == 'nt':   # run by pythonw from Task Scheduler: keep curl/gh from opening console windows
     _run = subprocess.run
@@ -25,6 +28,8 @@ if os.name == 'nt':   # run by pythonw from Task Scheduler: keep curl/gh from op
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_feeds as b   # noqa: E402
 import build_economy as econ   # noqa: E402
+
+SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 
 REPO = 'repos/investwithdon7-rgb/ceylonpulse-data'
 LOG = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'CeylonPulse', 'home-refresh.log')
@@ -58,12 +63,37 @@ def gh(*args, body=None):
 
 
 def remote(name):
-    cur = gh(f'{REPO}/contents/data/{name}')
+    """GitHub's current copy of data/<name> (or of a repo path containing '/')."""
+    cur = gh(f'{REPO}/contents/{name if "/" in name else "data/" + name}')
+    if not cur.get('content'):   # files over 1 MB come without content: fetch them raw
+        raw = subprocess.run(['gh', 'api', cur['url'], '-H', 'Accept: application/vnd.github.raw'],
+                             capture_output=True, check=True).stdout
+        return json.loads(raw.decode('utf-8')), cur['sha']
     return json.loads(base64.b64decode(cur['content']).decode('utf-8')), cur['sha']
 
 
 def strip(d, *keys):
     return {k: v for k, v in d.items() if k not in keys}
+
+
+def put(rel, data, message):
+    """Upload repo path `rel` as compact JSON (archive files: no `checked` stamp)."""
+    for attempt in (1, 2):
+        try:
+            sha = gh(f'{REPO}/contents/{rel}').get('sha')
+        except RuntimeError:
+            sha = None   # a new year's file
+        body = {'message': message, 'content': base64.b64encode(json.dumps(data, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).decode()}
+        if sha:
+            body['sha'] = sha
+        try:
+            res = gh(f'{REPO}/contents/{rel}', '-X', 'PUT', body=body)
+            log(f'{rel}: uploaded as commit {res["commit"]["sha"][:7]}')
+            return
+        except RuntimeError as e:
+            if attempt == 2:
+                log(f'{rel}: upload failed: {e}')
+                raise
 
 
 def upload(name, payload, now, renew):
@@ -133,10 +163,36 @@ def refresh_economy(now):
     return not failed
 
 
+def refresh_prices(now):
+    """Run build_prices.py in a scratch copy of the repo holding GitHub's current files."""
+    years = [f['name'] for f in gh(f'{REPO}/contents/archive/prices') if re.match(r'\d{4}\.json$', f['name'])]
+    with tempfile.TemporaryDirectory() as tmp:
+        os.makedirs(os.path.join(tmp, 'data'))
+        os.makedirs(os.path.join(tmp, 'archive', 'prices'))
+        shutil.copytree(SCRIPTS, os.path.join(tmp, 'scripts'), ignore=shutil.ignore_patterns('__pycache__'))
+        before = {}
+        for rel in ['data/prices.json'] + [f'archive/prices/{y}' for y in years]:
+            before[rel], _ = remote(rel)
+            json.dump(before[rel], open(os.path.join(tmp, rel), 'w', encoding='utf-8'), ensure_ascii=False)
+        r = subprocess.run([sys.executable, os.path.join(tmp, 'scripts', 'build_prices.py')],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+        out = (r.stdout or '') + (r.stderr or '')
+        failed = r.returncode != 0 or 'keeping previous' in out
+        log('prices: ' + ' | '.join(l.strip() for l in out.splitlines() if l.strip())[:300])
+        for y in sorted(os.listdir(os.path.join(tmp, 'archive', 'prices'))):
+            rel = f'archive/prices/{y}'
+            new = json.load(open(os.path.join(tmp, rel), encoding='utf-8'))
+            if new != before.get(rel):
+                put(rel, new, f'Price report archive from home PC {now:%Y-%m-%d}')
+        new = json.load(open(os.path.join(tmp, 'data', 'prices.json'), encoding='utf-8'))
+    upload('prices.json', {k: v for k, v in new.items() if k not in ('generated', 'checked')}, now, renew=not failed)
+    return not failed
+
+
 def main():
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
     ok = True
-    for job in (refresh_fuel, refresh_economy):
+    for job in (refresh_fuel, refresh_economy, refresh_prices):
         try:
             ok = job(now) and ok
         except Exception as e:

@@ -210,6 +210,9 @@ def main():
 
     have = {d for a in years.values() for d in a['days']}
     page = curl(LIST_URL) or ''
+    if 'price_report_' not in page:
+        # cbsl.gov.lk refuses GitHub's servers (Oct 2026): scripts/local_refresh.py runs this from a home PC
+        print('prices: report list unavailable; keeping previous file')
     days = {f'{d[:4]}-{d[4:6]}-{d[6:]}' for d in re.findall(r'price_report_(\d{8})_e\.pdf', page)}
     if '--backfill' in sys.argv:
         n = int(sys.argv[sys.argv.index('--backfill') + 1])
@@ -267,6 +270,7 @@ def main():
     if os.path.exists(path):
         old = json.load(open(path, encoding='utf-8'))
         old.pop('generated', None)
+        old.pop('checked', None)  # set by scripts/local_refresh.py
         if old == payload:
             print('prices.json: unchanged')
             return
