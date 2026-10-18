@@ -29,7 +29,7 @@ jobs:
         if: always()
         run: |
           pip install -q pypdf
-          python scripts/health.py run epidemiology 100 scripts/build_epid.py
+          python scripts/health.py run epidemiology 336 scripts/build_epid.py
       - name: Colombo Consumer Price Index (DCS)
         if: always()
         run: python scripts/health.py run ccpi 100 scripts/build_ccpi.py

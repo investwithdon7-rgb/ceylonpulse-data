@@ -21,7 +21,7 @@ UA = 'Mozilla/5.0 (compatible; CeylonPulse-data/1.0; +https://github.com/investw
 COLOMBO = dt.timezone(dt.timedelta(hours=5, minutes=30))
 
 FUEL_URL = 'https://ceypetco.gov.lk/marketing-sales/'
-FUEL_HISTORY_URL = 'https://ceypetco.gov.lk/historical-prices/'
+FUEL_HISTORY_URL = 'https://ceypetco.gov.lk/marketing-sales/historical-prices'
 RES_SHEET = ('https://docs.google.com/spreadsheets/d/e/2PACX-1vTcSGhi9RESl7CMCl1TQnrKe07Gx5Q696YiSB9jneIHqIP9lifpqSErgI3D5k9KtQXSdW5JpycIIr5e/'
              'pub?output=csv')
 GAUGES = 'https://services3.arcgis.com/J7ZFXmR8rSmQ3FGf/arcgis/rest/services/gauges_2_view/FeatureServer/0/query'
@@ -68,17 +68,23 @@ def save_if_changed(name, payload):
 
 
 # ── Fuel prices ────────────────────────────────────────────────────
+# Since Oct 2026 ceypetco.gov.lk is a JavaScript app; its public JSON API holds the prices
+FUEL_API = 'https://api.ceypetco.gov.lk/api/admin/'
+
+
+def fuel_api(path):
+    raw = get(FUEL_API + path)
+    data = json.loads(raw).get('data') if raw else None
+    return data if isinstance(data, list) else None
+
+
 def fuel():
-    page = get(FUEL_URL)
-    if not page:
+    rows = fuel_api('fuel-prices/active')
+    if rows is None:
         return None
-    t = re.sub(r'(?is)<(script|style).*?</\1>', ' ', page)
-    text = re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', t)))
-    items = re.findall(r'(Lanka [A-Za-z0-9 .()\-]+?)\s+(?:White|Black) Oil\s+Rs\.\s*([\d,]+\.\d+)\s+per Ltr'
-                       r'(?:\s+\S*\s*Effect from:\s*(\d{2}-\d{2}-\d{4}))?', text)
-    # A name can swallow preceding page text; keep only the last "Lanka ..." part
-    products = [{'name': 'Lanka ' + n.rsplit('Lanka ', 1)[-1].strip(), 'price': num(p), 'effective': e or None}
-                for n, p, e in items]
+    products = [{'name': r['product'].strip(), 'price': float(r['price']),
+                 'effective': '-'.join(reversed(r['effectiveDate'][:10].split('-'))) if r.get('effectiveDate') else None}
+                for r in rows if r.get('status', 'active') == 'active' and r.get('product') and r.get('price') is not None]
     by = {p['name']: p for p in products}
 
     def pick(*names):
@@ -94,41 +100,49 @@ def fuel():
     }
     # Sanity check before publishing: the main grades must be present and plausible
     if not all(out[k] and 100 < out[k] < 2000 for k in ('petrol92', 'petrol95', 'diesel')):
-        print('fuel: page layout changed or prices implausible; keeping previous file')
+        print('fuel: product names changed or prices implausible; keeping previous file')
         return None
     return out
 
 
 # ── Fuel price history (CPC revisions since 2015) ─────────────
+# API rows hold values in the order LP 95, LP 92, LAD, LSD, LK, LIK, FUR 800, FUR 1500 (High), (Low)
 FUEL_COLS = {'LP 95': 'petrol95', 'LP 92': 'petrol92', 'LAD': 'diesel', 'LSD': 'superDiesel', 'LK': 'kerosene'}
 
 
-def fuel_history():
-    page = get(FUEL_HISTORY_URL)
-    if not page:
+def fuel_history(current=None):
+    rows = fuel_api('historical-prices/active')
+    if rows is None:
         return None
-    t = re.sub(r'(?is)<(script|style).*?</\1>', ' ', page)
-    cell = lambda c: re.sub(r'\s+', ' ', html.unescape(re.sub(r'<[^>]+>', ' ', c))).strip()
-    for table in re.findall(r'(?is)<table.*?</table>', t):
-        rows = [[cell(c) for c in re.findall(r'(?is)<t[hd].*?</t[hd]>', r)] for r in re.findall(r'(?is)<tr.*?</tr>', table)]
-        if not rows or rows[0][:3] != ['Date', 'LP 95', 'LP 92']:
-            continue  # the second table is the pre-2006 per-circular list
-        idx = {k: rows[0].index(k) for k in FUEL_COLS if k in rows[0]}
-        out = []
-        for r in rows[1:]:
-            m = re.match(r'(\d{2})\.(\d{2})\.(\d{4})$', r[0])
-            if not m:
-                continue
-            out.append([f'{m.group(3)}-{m.group(2)}-{m.group(1)}'] + [num(r[idx[k]]) if k in idx and idx[k] < len(r) else None for k in FUEL_COLS])
-        out.sort()
-        # Keep 2015 onwards, plus the revision in force on 1 Jan 2015
-        before = [r for r in out if r[0] < '2015-01-01']
-        out = before[-1:] + [r for r in out if r[0] >= '2015-01-01']
-        if len(out) < 20:
-            return None  # table layout changed; keep the previous file
-        return {'source': 'Ceylon Petroleum Corporation — historical prices', 'url': FUEL_HISTORY_URL, 'units': 'LKR per litre',
-                'columns': ['date'] + list(FUEL_COLS.values()), 'revisions': out}
-    return None
+    out = {}
+    for r in rows:
+        m = re.match(r'(\d{2})\.(\d{2})\.(\d{4})', r.get('dateLabel', ''))
+        if r.get('kind') != 'fuel' or r.get('status', 'active') != 'active' or not m:
+            continue
+        out[f'{m.group(3)}-{m.group(2)}-{m.group(1)}'] = [num(v) for v in (r.get('values') or [])[:len(FUEL_COLS)]]
+    if len(out) < 20:
+        return None  # API changed; keep the previous file
+    # CPC adds revisions to this list days after they take effect: keep ones already published
+    path = os.path.join(DATA, 'fuel-history.json')
+    if os.path.exists(path):
+        last = max(out)
+        for r in json.load(open(path, encoding='utf-8')).get('revisions', []):
+            if r[0] > last and r[1:] != out[last]:
+                out[r[0]] = r[1:]
+    revs = sorted([d] + v for d, v in out.items())
+    # ...and today's prices, if they are a revision the list does not have yet
+    if current and current.get('petrol92'):
+        now = [current.get(k) for k in FUEL_COLS.values()]
+        eff = max((p['effective'] for p in current['products'] if p['effective']),
+                  key=lambda e: e[6:] + e[3:5] + e[:2], default=None)
+        if eff and now != revs[-1][1:]:
+            revs.append(['-'.join(reversed(eff.split('-')))] + now)
+            revs.sort()
+    # Keep 2015 onwards, plus the revision in force on 1 Jan 2015
+    before = [r for r in revs if r[0] < '2015-01-01']
+    revs = before[-1:] + [r for r in revs if r[0] >= '2015-01-01']
+    return {'source': 'Ceylon Petroleum Corporation — historical prices', 'url': FUEL_HISTORY_URL, 'units': 'LKR per litre',
+            'columns': ['date'] + list(FUEL_COLS.values()), 'revisions': revs}
 
 
 # ── Major reservoirs (Irrigation Department daily sheet) ───────────
@@ -299,17 +313,19 @@ MAX_HOURS = {'fuel.json': 48, 'fuel-history.json': 72, 'reservoirs.json': 36, 'r
 
 def main():
     os.makedirs(DATA, exist_ok=True)
+    results = {}
     for name, fn in (('fuel.json', fuel), ('fuel-history.json', fuel_history), ('reservoirs.json', reservoirs), ('rivers.json', rivers), ('cse.json', cse), ('fires.json', fires)):
         if name == 'fires.json' and not os.environ.get('FIRMS_KEY'):
             print('fires: FIRMS_KEY not set; skipping')
             continue
         error = 'source unavailable or page layout changed'
         try:
-            payload = fn()
+            payload = fn(results.get('fuel.json')) if fn is fuel_history else fn()
         except Exception as e:
             print(f'{name}: error {e}')
             payload, error = None, f'error {e}'
         if payload:
+            results[name] = payload
             health.ok(name)
             save_if_changed(name, payload)
             if name == 'reservoirs.json':

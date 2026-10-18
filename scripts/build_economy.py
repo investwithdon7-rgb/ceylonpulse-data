@@ -11,13 +11,14 @@ names change with every update, so the links are found by their labels):
 Each part is optional: if a sheet moves or changes shape, its previous values are kept.
 Needs: pip install openpyxl
 """
-import datetime as dt, html, io, json, os, re, subprocess
+import datetime as dt, html, io, json, os, re, subprocess, time
 
 import openpyxl
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, 'data', 'economy.json')
 UA = 'Mozilla/5.0 (compatible; CeylonPulse-data/1.0; +https://github.com/investwithdon7-rgb/ceylonpulse-data)'
+BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36'
 BASE = 'https://www.cbsl.gov.lk/en/statistics/statistical-tables/'
 PAGES = {
     'monetary': BASE + 'monetary-sector',
@@ -31,11 +32,17 @@ START_YEAR = 2015
 
 
 def curl(url, binary=False):
-    r = subprocess.run(['curl', '-sSL', '--fail', '-m', '120', '-A', UA, url], capture_output=True)
-    if r.returncode != 0:
-        print('  fetch failed', url[-80:])
-        return None
-    return r.stdout if binary else r.stdout.decode('utf-8', errors='replace')
+    # Browser-like headers: cbsl.gov.lk started refusing plain requests from GitHub's servers (Oct 2026)
+    cmd = ['curl', '-sSL', '--fail', '--compressed', '-m', '120', '-A', BROWSER_UA,
+           '-H', 'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+           '-H', 'Accept-Language: en-US,en;q=0.9', url]
+    for i in range(2):
+        r = subprocess.run(cmd, capture_output=True)
+        if r.returncode == 0:
+            return r.stdout if binary else r.stdout.decode('utf-8', errors='replace')
+        time.sleep(15)
+    print('  fetch failed', url[-80:], r.stderr.decode(errors='replace').strip()[:120])
+    return None
 
 
 _links = {}
