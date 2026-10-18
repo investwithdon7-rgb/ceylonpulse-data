@@ -16,6 +16,10 @@ Run by hand: python scripts/local_fuel.py
 """
 import base64, datetime as dt, json, os, subprocess, sys, tempfile
 
+if os.name == 'nt':   # run by pythonw from Task Scheduler: keep curl/gh from opening console windows
+    _run = subprocess.run
+    subprocess.run = lambda *a, **k: _run(*a, **{'creationflags': subprocess.CREATE_NO_WINDOW, **k})
+
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import build_feeds as b   # noqa: E402
 
