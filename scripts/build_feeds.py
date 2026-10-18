@@ -1,4 +1,4 @@
-"""Daily CeylonPulse feeds -> data/fuel.json, fuel-history.json, reservoirs.json, rivers.json, cse.json, fires.json
+"""Hourly CeylonPulse feeds -> data/fuel.json, fuel-history.json, reservoirs.json, rivers.json, cse.json, fires.json
 
 Sources that block browser proxies but answer a normal server request:
   * Fuel prices: Ceylon Petroleum Corporation (ceypetco.gov.lk), plus its price
@@ -308,9 +308,9 @@ def fires():
 
 
 # Hours a feed may keep failing (previous file kept, GitHub warning) before the run goes red.
-# The workflow runs once a day, so 50 h = red on the third missed day in a row
-MAX_HOURS = {'fuel.json': 50, 'fuel-history.json': 74, 'reservoirs.json': 50, 'rivers.json': 50,
-             'cse.json': 74, 'fires.json': 50}
+# Live feeds run hourly; the fuel files come from the home PC once a day (see LOCAL_OK_HOURS)
+MAX_HOURS = {'fuel.json': 50, 'fuel-history.json': 74, 'reservoirs.json': 36, 'rivers.json': 12,
+             'cse.json': 72, 'fires.json': 24}
 # Ceypetco's API only answers Sri Lankan connections: scripts/local_refresh.py uploads the fuel
 # files from a home PC and stamps fuel.json `checked`; a copy that recent counts as up to date
 LOCAL_OK_HOURS = 36
@@ -334,6 +334,11 @@ def main():
         if name == 'fires.json' and not os.environ.get('FIRMS_KEY'):
             print('fires: FIRMS_KEY not set; skipping')
             continue
+        if (age := local_copy_age(name)) is not None and age < LOCAL_OK_HOURS:
+            # Ceypetco refuses GitHub: the home PC keeps this file fresh, so skip the timeouts
+            print(f'{name}: skipped; home PC copy checked {age:.1f} h ago')
+            health.ok(name)
+            continue
         error = 'source unavailable or page layout changed'
         try:
             payload = fn(results.get('fuel.json')) if fn is fuel_history else fn()
@@ -351,9 +356,6 @@ def main():
                 day = dt.datetime.now(COLOMBO).date().isoformat()
                 json.dump(payload, open(os.path.join(arch, f'{day}.json'), 'w', encoding='utf-8'),
                           ensure_ascii=False, separators=(',', ':'))
-        elif (age := local_copy_age(name)) is not None and age < LOCAL_OK_HOURS:
-            print(f'{name}: unreachable from GitHub; home PC copy checked {age:.1f} h ago')
-            health.ok(name)
         else:
             print(f'{name}: kept previous file')
             health.fail(name, error, MAX_HOURS[name])

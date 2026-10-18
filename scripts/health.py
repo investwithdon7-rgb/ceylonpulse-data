@@ -17,7 +17,8 @@ Use from Python (build_feeds.py) with ok()/fail()/finish(), or wrap any script:
 A wrapped script counts as failing when it exits non-zero or prints one of the
 "kept previous" messages the build scripts use when a source fails.
 --local: the source refuses GitHub, and scripts/local_refresh.py uploads data/FILE
-from a home PC with a `checked` time; a copy checked within HOURS counts as OK.
+from a home PC with a `checked` time; while that copy is less than HOURS old the
+script is not run at all (it counts as OK), after that GitHub tries the source itself.
 """
 import datetime as dt, json, os, re, subprocess, sys
 
@@ -93,6 +94,14 @@ def local_age(name):
 
 
 def run(feed, max_hours, cmd, local=None):
+    if local:
+        name, hours = local.split(':')
+        age = local_age(name)
+        if age is not None and age < float(hours):
+            # The source refuses GitHub: don't spend the run on it while the home PC copy is fresh
+            print(f'{feed}: skipped; home PC copy of {name} checked {age:.1f} h ago')
+            ok(feed)
+            finish()
     r = subprocess.run([sys.executable, *cmd], capture_output=True, text=True, encoding='utf-8', errors='replace')
     out = (r.stdout or '') + (r.stderr or '')
     print(out, end='' if out.endswith('\n') or not out else '\n')
