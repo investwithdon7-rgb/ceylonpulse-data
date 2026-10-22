@@ -1,7 +1,7 @@
 {
  "failingSince": "2026-10-19T19:25:06+00:00",
  "feed": "fuel-history.json",
- "lastChecked": "2026-10-21T01:39:09+00:00",
+ "lastChecked": "2026-10-22T01:35:06+00:00",
  "lastError": "source unavailable or page layout changed",
  "maxHours": 74
 }
