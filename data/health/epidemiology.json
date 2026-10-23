@@ -1,7 +1,7 @@
 {
  "failingSince": "2026-10-14T05:07:06+00:00",
  "feed": "epidemiology",
- "lastChecked": "2026-10-22T05:06:15+00:00",
+ "lastChecked": "2026-10-23T05:05:45+00:00",
  "lastError": "exit 1: fetch failed https://www.epid.gov.lk/weekly-epidemiological-report curl: (22) The requested URL returned error: 500",
  "maxHours": 336
 }
