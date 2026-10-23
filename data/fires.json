@@ -1,1 +1,1 @@
-{"generated":"2026-10-23T01:34:58+00:00","fires":[],"days":3,"source":"NASA FIRMS · VIIRS 375 m (NOAA-20 + Suomi-NPP)"}
+{"generated":"2026-10-23T13:30:50+00:00","fires":[{"lat":6.40633,"lon":80.87483,"brightness":333.05,"date":"2026-10-23","time":"0813","satellite":"N","confidence":"n","frp":4.97,"daynight":"D"}],"days":3,"source":"NASA FIRMS · VIIRS 375 m (NOAA-20 + Suomi-NPP)"}
