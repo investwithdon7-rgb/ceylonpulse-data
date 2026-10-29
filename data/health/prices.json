@@ -1,0 +1,7 @@
+{
+ "failingSince": "2026-10-29T07:09:35+00:00",
+ "feed": "prices",
+ "lastChecked": "2026-10-29T07:09:35+00:00",
+ "lastError": "prices: report list unavailable; keeping previous file",
+ "maxHours": 50
+}
