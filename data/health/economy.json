@@ -1,7 +1,7 @@
 {
  "failingSince": "2026-10-29T06:07:32+00:00",
  "feed": "economy",
- "lastChecked": "2026-10-29T06:07:32+00:00",
+ "lastChecked": "2026-10-30T06:08:20+00:00",
  "lastError": "rates: kept previous; reserves: kept previous; remittances: kept previous; tourismEarnings: kept previous; gdpGrowth: kept previous; unemployment: kept previous",
  "maxHours": 100
 }
