@@ -6,17 +6,20 @@
     -> data/economy.json (same build_economy.py readers)
   * CBSL Daily Price Report (same block) -> data/prices.json, archive/prices/YYYY.json
 
-Runs from Windows Task Scheduler daily at 18:15 Sri Lanka time, an hour after
-CBSL usually posts the price report ("CeylonPulse home refresh"; a missed run
-starts when the PC is next on)
-and uploads with the GitHub API (`gh`), because plain git pushes are blocked on
-that PC. fuel.json, economy.json and prices.json get a `checked` time: the GitHub workflows
-still try the sources themselves and, when refused, count a copy checked
-recently as up to date (build_feeds.LOCAL_OK_HOURS, health.py --local), so
-runs stay green while the PC keeps the data fresh. An unchanged file is
-re-uploaded only twice a day, just to renew `checked`.
+Task Scheduler ("CeylonPulse home refresh") starts this hourly and at logon, but
+each source is fetched only once a day: a job runs when its `checked` time is
+older than the latest 18:15 Sri Lanka time (an hour after CBSL usually posts
+the price report), and retries on later starts until it succeeds. One attempt a
+day was not enough: the PC is often off, just waking with no network, or a
+source is briefly down. Uploads use the GitHub API (`gh`), because plain git
+pushes are blocked on that PC.
 
-Log: %LOCALAPPDATA%\\CeylonPulse\\home-refresh.log
+fuel.json, economy.json and prices.json get a `checked` time: the GitHub
+workflows skip those sources while a copy is recent (build_feeds.LOCAL_OK_HOURS,
+health.py --local) and otherwise try the source themselves.
+
+Log: ~/.ceylonpulse/home-refresh.log (not AppData: apps packaged as MSIX, such as
+Claude desktop, see a private copy of AppData and could not read the task's log)
 Run by hand: python scripts/local_refresh.py
 """
 import base64, contextlib, datetime as dt, io, json, os, re, shutil, subprocess, sys, tempfile
@@ -32,8 +35,9 @@ import build_economy as econ   # noqa: E402
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 
 REPO = 'repos/investwithdon7-rgb/ceylonpulse-data'
-LOG = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), 'CeylonPulse', 'home-refresh.log')
-RENEW_HOURS = 12
+LOG = os.path.join(os.path.expanduser('~'), '.ceylonpulse', 'home-refresh.log')
+COLOMBO = dt.timezone(dt.timedelta(hours=5, minutes=30))
+DAILY_AT = (18, 15)   # Sri Lanka time
 
 
 def log(msg):
@@ -96,12 +100,25 @@ def put(rel, data, message):
                 raise
 
 
+def latest_slot(now):
+    """The most recent 18:15 Sri Lanka time at or before `now`."""
+    local = now.astimezone(COLOMBO)
+    slot = local.replace(hour=DAILY_AT[0], minute=DAILY_AT[1], second=0, microsecond=0)
+    return slot if slot <= local else slot - dt.timedelta(days=1)
+
+
+def is_due(name, now):
+    """True when data/<name> has not been confirmed since the latest daily slot."""
+    checked = remote(name)[0].get('checked')
+    return not checked or dt.datetime.fromisoformat(checked) < latest_slot(now)
+
+
 def upload(name, payload, now, renew):
-    """Upload data/<name> if its data changed (or `checked` is due a renewal)."""
+    """Upload data/<name> if its data changed, or to renew `checked` after a good read."""
     for attempt in (1, 2):   # the hourly bot may commit in between: re-read and retry once
         old, sha = remote(name)
         if strip(old, 'generated', 'checked') == payload:
-            due = renew and (now - dt.datetime.fromisoformat(old.get('checked', '2000-01-01T00:00:00+00:00'))).total_seconds() > RENEW_HOURS * 3600
+            due = renew
             if not due:
                 log(f'{name}: unchanged')
                 return False
@@ -146,9 +163,6 @@ def refresh_fuel(now):
 
 def refresh_economy(now):
     old, _ = remote('economy.json')
-    age = (now - dt.datetime.fromisoformat(old.get('checked', '2000-01-01T00:00:00+00:00'))).total_seconds() / 3600
-    if age < 20:
-        return True   # CBSL tables change at most daily
     with tempfile.TemporaryDirectory() as tmp:
         econ.OUT = os.path.join(tmp, 'economy.json')
         json.dump(old, open(econ.OUT, 'w', encoding='utf-8'), ensure_ascii=False)
@@ -192,9 +206,10 @@ def refresh_prices(now):
 def main():
     now = dt.datetime.now(dt.timezone.utc).replace(microsecond=0)
     ok = True
-    for job in (refresh_fuel, refresh_economy, refresh_prices):
+    for job, name in ((refresh_fuel, 'fuel.json'), (refresh_economy, 'economy.json'), (refresh_prices, 'prices.json')):
         try:
-            ok = job(now) and ok
+            if is_due(name, now):
+                ok = job(now) and ok
         except Exception as e:
             log(f'{job.__name__}: {e}')
             ok = False

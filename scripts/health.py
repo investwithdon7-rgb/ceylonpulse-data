@@ -1,9 +1,12 @@
-"""Feed health: a run goes red only when a source has been down too long.
+"""Feed health: a run goes red only for a fault in our own scripts.
 
-Sources (government sites, NASA FIRMS) often drop out for a few hours. The
-build scripts then keep the previous file, so the site stays up, and that is
-reported as a GitHub warning. The run fails only once a feed has been failing
-for longer than its `max_hours`.
+Sources (government sites, NASA FIRMS) drop out, sometimes for weeks, and nothing
+here can fix that. The build scripts then keep the previous file, so the site
+stays up, and the run reports a GitHub warning; past the feed's `max_hours` the
+warning says STALE and the feed is listed in the run summary, but the run stays
+green. A run fails only when a script crashes (a Python traceback that is not a
+network error) for longer than `max_hours`.
+Which feeds are failing right now: the files in data/health/.
 
 State lives in data/health/<feed>.json, one file per failing feed:
   {"feed": name, "failingSince": ISO time, "lastError": str, "maxHours": n, "lastChecked": ISO time}
@@ -26,6 +29,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DIR = os.path.join(ROOT, 'data', 'health')
 LEGACY = os.path.join(ROOT, 'data', 'feeds-health.json')   # single-file state used until 18 Oct 2026
 SOFT_FAIL = re.compile(r'(?i)keeping previous|kept previous')
+NETWORK = re.compile(r'(?i)URLError|HTTPError|timed? ?out|ConnectionError|RemoteDisconnected|IncompleteRead|SSLError|socket\.')
 
 _seen = {}
 
@@ -55,11 +59,14 @@ def ok(feed):
         os.remove(_path(feed))
 
 
-def fail(feed, error, max_hours):
+def fail(feed, error, max_hours, crash=False):
     now = _now().isoformat()
     old = _load(feed)
     e = dict(old or {'feed': feed, 'failingSince': now})
     e['maxHours'] = max_hours
+    e.pop('crash', None)
+    if crash:
+        e['crash'] = True
     if e.get('lastError') != error[:300] or e.get('lastChecked', '')[:10] != now[:10]:
         e['lastError'], e['lastChecked'] = error[:300], now
     if e != old:
@@ -69,19 +76,27 @@ def fail(feed, error, max_hours):
 
 
 def finish():
-    """Report this run's failing feeds, and exit 1 only if one is stale."""
-    stale = []
+    """Report this run's failing feeds; exit 1 only for a script crash past its limit."""
+    red, rows = [], []
     for feed, e in _seen.items():
         if e is None:
             continue
         hours = (_now() - dt.datetime.fromisoformat(e['failingSince'])).total_seconds() / 3600
+        over = hours >= e['maxHours']
         msg = f"{feed}: failing for {hours:.1f} h (limit {e['maxHours']} h), previous data kept - {e['lastError']}"
-        if hours >= e['maxHours']:
-            stale.append(feed)
-            print(f'::error title={feed} is stale::{msg}')
+        if over and e.get('crash'):
+            red.append(feed)
+            print(f'::error title={feed} script crash::{msg}')
+        elif over:
+            print(f'::warning title={feed} is STALE::{msg}')
         else:
             print(f'::warning title={feed} temporarily unavailable::{msg}')
-    sys.exit(1 if stale else 0)
+        if over:
+            rows.append(f"- **{feed}** stale for {hours / 24:.1f} days: {e['lastError'][:200]}\n")
+    if rows and os.environ.get('GITHUB_STEP_SUMMARY'):
+        with open(os.environ['GITHUB_STEP_SUMMARY'], 'a', encoding='utf-8') as f:
+            f.writelines(rows)
+    sys.exit(1 if red else 0)
 
 
 def local_age(name):
@@ -114,7 +129,8 @@ def run(feed, max_hours, cmd, local=None):
             soft, r.returncode = [], 0
     if r.returncode != 0:
         tail = [l.strip() for l in out.splitlines() if l.strip()][-1:] or ['']
-        fail(feed, f'exit {r.returncode}: {tail[0]}', max_hours)
+        crash = 'Traceback (most recent call last)' in out and not NETWORK.search(tail[0])
+        fail(feed, f'exit {r.returncode}: {tail[0]}', max_hours, crash)
     elif soft:
         fail(feed, '; '.join(soft)[:300], max_hours)
     else:

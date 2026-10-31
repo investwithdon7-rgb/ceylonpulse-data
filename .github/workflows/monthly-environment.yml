@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 # Each build runs through scripts/health.py: a source that fails keeps its previous
-# file and shows a warning; the run goes red only after the feed's hour limit.
+# file and shows a warning (STALE past the feed's hour limit); only a script crash goes red.
 permissions:
   contents: write
 

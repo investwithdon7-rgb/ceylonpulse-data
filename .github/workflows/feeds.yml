@@ -4,12 +4,12 @@ on:
   schedule:
     # Live data (river gauges, reservoirs, fires, CSE, news) every hour. Fuel and the
     # CBSL price report refuse GitHub: scripts/local_refresh.py uploads them from a
-    # home PC daily at 18:15 Sri Lanka time, and these runs skip them while that copy is fresh
+    # home PC once a day after 18:15 Sri Lanka time, and these runs skip them while that copy is fresh
     - cron: '20 * * * *'
   workflow_dispatch:
 
 # Each build runs through scripts/health.py: a source that fails keeps its previous
-# file and shows a warning; the run goes red only after the feed's hour limit.
+# file and shows a warning (STALE past the feed's hour limit); only a script crash goes red.
 permissions:
   contents: write
 
@@ -35,7 +35,9 @@ jobs:
         run: |
           pip install -q pypdf
           python scripts/health.py run prices 50 --local prices.json:36 scripts/build_prices.py
-          python scripts/health.py run tourism 72 scripts/build_tourism.py
+      - name: SLTDA weekly arrivals and US travel advisory
+        if: always()
+        run: python scripts/health.py run tourism 72 scripts/build_tourism.py
       - name: News headlines (7 Sri Lankan RSS feeds)
         if: always()
         run: python scripts/health.py run news 12 scripts/build_news.py
