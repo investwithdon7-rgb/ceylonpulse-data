@@ -1,0 +1,7 @@
+{
+ "failingSince": "2026-11-05T10:59:10+00:00",
+ "feed": "gazette",
+ "lastChecked": "2026-11-05T10:59:10+00:00",
+ "lastError": "extraordinary: page not parsed; kept previous; gazettes: page not parsed; kept previous",
+ "maxHours": 48
+}
