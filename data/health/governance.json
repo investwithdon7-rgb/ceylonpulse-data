@@ -1,0 +1,7 @@
+{
+ "failingSince": "2026-11-16T10:05:35+00:00",
+ "feed": "governance",
+ "lastChecked": "2026-11-16T10:05:35+00:00",
+ "lastError": "egdi: failed; kept previous",
+ "maxHours": 160
+}
