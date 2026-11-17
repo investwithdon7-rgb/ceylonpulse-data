@@ -1,7 +1,0 @@
-{
- "failingSince": "2026-11-17T13:29:08+00:00",
- "feed": "fires.json",
- "lastChecked": "2026-11-17T13:29:08+00:00",
- "lastError": "source unavailable or page layout changed",
- "maxHours": 24
-}
